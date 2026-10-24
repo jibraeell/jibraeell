@@ -215,22 +215,40 @@ def loc_query(owner_affiliation, comment_size=0, force_cache=False, cursor=None,
         return cache_builder(edges + request.json()['data']['user']['repositories']['edges'], comment_size, force_cache)
 
 
+
 def cache_builder(edges, comment_size, force_cache, loc_add=0, loc_del=0):
     """
-    Checks each repository in edges to see if it has been updated since the last time it was cached
-    If it has, run recursive_loc on that repository to update the LOC count
+    Checks each repository in edges to see if it has been updated since
+    the last time it was cached. If it has, run recursive_loc on that
+    repository to update the LOC count.
     """
-    cached = True # Assume all repositories are cached
-    filename = 'cache/'+hashlib.sha256(USER_NAME.encode('utf-8')).hexdigest()+'.txt' # Create a unique filename for each user
+    cached = True  # Assume all repositories are cached
+
+    # Ensure the cache directory exists
+    os.makedirs('cache', exist_ok=True)
+
+    # Create a unique filename for this user
+    filename = 'cache/' + hashlib.sha256(
+        USER_NAME.encode('utf-8')
+    ).hexdigest() + '.txt'
+
     try:
         with open(filename, 'r') as f:
             data = f.readlines()
-    except FileNotFoundError: # If the cache file doesn't exist, create it
+
+    except FileNotFoundError:
+        # If the cache file doesn't exist, create it
         data = []
+
         if comment_size > 0:
-            for _ in range(comment_size): data.append('This line is a comment block. Write whatever you want here.\n')
+            for _ in range(comment_size):
+                data.append(
+                    'This line is a comment block. Write whatever you want here.\n'
+                )
+
         with open(filename, 'w') as f:
             f.writelines(data)
+
 
     if len(data)-comment_size != len(edges) or force_cache: # If the number of repos has changed, or force_cache is True
         cached = False
