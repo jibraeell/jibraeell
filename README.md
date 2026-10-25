@@ -1,7 +1,3 @@
-# Hi, I'm jibraeel 👋
-
-This repository automatically refreshes my GitHub profile statistics and displays a custom ASCII portrait generated from my photo.
-
 <picture>
   <source
     media="(prefers-color-scheme: dark)"
