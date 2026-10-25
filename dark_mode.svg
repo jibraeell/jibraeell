@@ -8,11 +8,11 @@ font-display: swap;
 -webkit-size-adjust: 109%;
 size-adjust: 109%;
 }
-.key { fill: #7ee787; }      /* Terminal green */
-.value { fill: #c9d1d9; }    /* Soft white */
-.addColor { fill: #7ee787; } /* Terminal green */
-.delColor { fill: #f47067; } /* Muted red */
-.cc { fill: #484f58; }       /* Subtle separators */
+.key {fill: #953800;}
+.value {fill: #0a3069;}
+.addColor {fill: #1a7f37;}
+.delColor {fill: #cf222e;}
+.cc {fill: #c2cfde;}
 text, tspan {white-space: pre;}
 </style>
 <rect width="985px" height="530px" fill="#161b22" rx="15"/>
