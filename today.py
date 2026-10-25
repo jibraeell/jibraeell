@@ -22,6 +22,7 @@ if not ACCESS_TOKEN:
 HEADERS = {
     "Authorization": f"Bearer {ACCESS_TOKEN}",
     "Accept": "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
 }
 
 CACHE_DIR = Path("cache")
@@ -38,6 +39,7 @@ QUERY_COUNT = {
     "recursive_loc": 0,
     "graph_commits": 0,
     "loc_query": 0,
+    "rest_owned_repo_stars": 0,
 }
 
 OWNER_ID = None
@@ -82,8 +84,9 @@ def format_plural(unit):
 
 
 def daily_readme(birthday):
-    """Return the elapsed time since the configured birthday."""
-    diff = relativedelta.relativedelta(datetime.datetime.now(), birthday)
+    """Return elapsed time since the configured birthday."""
+    now = datetime.datetime.now()
+    diff = relativedelta.relativedelta(now, birthday)
     birthday_today = diff.months == 0 and diff.days == 0
 
     return (
@@ -95,8 +98,9 @@ def daily_readme(birthday):
 
 
 def user_getter(username):
-    """Return the GitHub user ID and account creation date."""
+    """Return GitHub user ID and account creation date."""
     query_count("user_getter")
+
     query = """
     query($login: String!) {
         user(login: $login) {
@@ -105,6 +109,7 @@ def user_getter(username):
         }
     }
     """
+
     data = simple_request("user_getter", query, {"login": username})
     user = data.get("user")
 
@@ -117,6 +122,7 @@ def user_getter(username):
 def follower_getter(username):
     """Return the user's current follower count."""
     query_count("follower_getter")
+
     query = """
     query($login: String!) {
         user(login: $login) {
@@ -126,6 +132,7 @@ def follower_getter(username):
         }
     }
     """
+
     data = simple_request("follower_getter", query, {"login": username})
     user = data.get("user") or {}
     followers = user.get("followers") or {}
@@ -134,8 +141,9 @@ def follower_getter(username):
 
 
 def graph_commits(start_date, end_date):
-    """Return the user's GitHub contribution count for a date range."""
+    """Return contribution count for a date range."""
     query_count("graph_commits")
+
     query = """
     query($start_date: DateTime!, $end_date: DateTime!, $login: String!) {
         user(login: $login) {
@@ -147,6 +155,7 @@ def graph_commits(start_date, end_date):
         }
     }
     """
+
     data = simple_request(
         "graph_commits",
         query,
@@ -156,6 +165,7 @@ def graph_commits(start_date, end_date):
             "login": USER_NAME,
         },
     )
+
     user = data.get("user") or {}
     collection = user.get("contributionsCollection") or {}
     calendar = collection.get("contributionCalendar") or {}
@@ -163,86 +173,93 @@ def graph_commits(start_date, end_date):
     return calendar.get("totalContributions") or 0
 
 
-def stars_counter(edges):
-    """Count repository stars, treating missing star data as zero."""
-    total = 0
+def rest_owned_repo_stars():
+    """Count stars received by repositories owned by the authenticated user."""
+    query_count("rest_owned_repo_stars")
+    total_stars = 0
+    page = 1
 
-    for edge in edges or []:
-        repository = (edge or {}).get("node") or {}
-        stargazers = repository.get("stargazers") or {}
-        total += stargazers.get("totalCount") or 0
+    while True:
+        try:
+            response = SESSION.get(
+                "https://api.github.com/user/repos",
+                params={
+                    "affiliation": "owner",
+                    "visibility": "all",
+                    "per_page": 100,
+                    "page": page,
+                },
+                timeout=45,
+            )
+            response.raise_for_status()
+            repos = response.json()
+        except (requests.RequestException, ValueError) as exc:
+            raise RuntimeError(
+                f"Could not retrieve owned repositories for star count: {exc}"
+            ) from exc
 
-    return total
+        if not isinstance(repos, list):
+            raise RuntimeError("GitHub returned an unexpected repository response.")
+
+        if not repos:
+            break
+
+        total_stars += sum(
+            repo.get("stargazers_count") or 0
+            for repo in repos
+        )
+
+        if len(repos) < 100:
+            break
+
+        page += 1
+
+    return total_stars
 
 
 def graph_repos_stars(count_type, owner_affiliation):
-    """Count repositories or stars across all matching repository pages."""
-    if count_type not in ("repos", "stars"):
+    """Count stars via REST and repository totals via GraphQL."""
+    if count_type == "stars":
+        return rest_owned_repo_stars()
+
+    if count_type != "repos":
         raise ValueError(f"Unsupported count type: {count_type}")
 
-    total = 0
-    cursor = None
+    query_count("graph_repos_stars")
 
-    while True:
-        query_count("graph_repos_stars")
-        query = """
-        query(
-            $owner_affiliation: [RepositoryAffiliation],
-            $login: String!,
-            $cursor: String
-        ) {
-            user(login: $login) {
-                repositories(
-                    first: 100,
-                    after: $cursor,
-                    ownerAffiliations: $owner_affiliation
-                ) {
-                    totalCount
-                    edges {
-                        node {
-                            nameWithOwner
-                            stargazers {
-                                totalCount
-                            }
-                        }
-                    }
-                    pageInfo {
-                        endCursor
-                        hasNextPage
-                    }
-                }
+    query = """
+    query(
+        $owner_affiliation: [RepositoryAffiliation],
+        $login: String!
+    ) {
+        user(login: $login) {
+            repositories(
+                first: 1,
+                ownerAffiliations: $owner_affiliation
+            ) {
+                totalCount
             }
         }
-        """
-        data = simple_request(
-            "graph_repos_stars",
-            query,
-            {
-                "owner_affiliation": owner_affiliation,
-                "login": USER_NAME,
-                "cursor": cursor,
-            },
-        )
-        user = data.get("user") or {}
-        repositories = user.get("repositories") or {}
+    }
+    """
 
-        if count_type == "repos":
-            total = repositories.get("totalCount") or 0
-            return total
+    data = simple_request(
+        "graph_repos_stars",
+        query,
+        {
+            "owner_affiliation": owner_affiliation,
+            "login": USER_NAME,
+        },
+    )
 
-        total += stars_counter(repositories.get("edges") or [])
-        page_info = repositories.get("pageInfo") or {}
+    user = data.get("user") or {}
+    repositories = user.get("repositories") or {}
 
-        if not page_info.get("hasNextPage"):
-            return total
-
-        cursor = page_info.get("endCursor")
-        if not cursor:
-            raise RuntimeError("GitHub returned a next page without a cursor.")
+    return repositories.get("totalCount") or 0
 
 
 def loc_query(owner_affiliation, comment_size=7, force_cache=False):
-    """Collect repositories and update the cached lines-of-code statistics."""
+    """Collect repositories and update cached lines-of-code statistics."""
     query_count("loc_query")
     edges = []
     cursor = None
@@ -282,6 +299,7 @@ def loc_query(owner_affiliation, comment_size=7, force_cache=False):
             }
         }
         """
+
         data = simple_request(
             "loc_query",
             query,
@@ -291,6 +309,7 @@ def loc_query(owner_affiliation, comment_size=7, force_cache=False):
                 "cursor": cursor,
             },
         )
+
         user = data.get("user") or {}
         repositories = user.get("repositories") or {}
 
@@ -307,35 +326,17 @@ def loc_query(owner_affiliation, comment_size=7, force_cache=False):
     return cache_builder(edges, comment_size, force_cache)
 
 
-def flush_cache(edges, filename, comment_size):
-    """Rebuild cache rows while retaining the comment header."""
-    comments = []
-
-    if filename.exists():
-        with filename.open("r", encoding="utf-8") as file:
-            comments = file.readlines()[:comment_size]
-
-    while len(comments) < comment_size:
-        comments.append(
-            "This line is a comment block. Write whatever you want here.\n"
-        )
-
-    with filename.open("w", encoding="utf-8") as file:
-        file.writelines(comments)
-
-        for edge in edges:
-            repository = (edge or {}).get("node") or {}
-            name = repository.get("nameWithOwner")
-
-            if name:
-                repo_hash = hashlib.sha256(name.encode("utf-8")).hexdigest()
-                file.write(f"{repo_hash} 0 0 0 0\n")
-
-
-def recursive_loc(owner, repo_name, addition_total=0,
-                  deletion_total=0, my_commits=0, cursor=None):
-    """Count commits authored by this user, including paginated history."""
+def recursive_loc(
+    owner,
+    repo_name,
+    addition_total=0,
+    deletion_total=0,
+    my_commits=0,
+    cursor=None,
+):
+    """Count commits authored by this user across paginated history."""
     query_count("recursive_loc")
+
     query = """
     query($repo_name: String!, $owner: String!, $cursor: String) {
         repository(name: $repo_name, owner: $owner) {
@@ -365,15 +366,20 @@ def recursive_loc(owner, repo_name, addition_total=0,
         }
     }
     """
+
     data = simple_request(
         "recursive_loc",
         query,
-        {"repo_name": repo_name, "owner": owner, "cursor": cursor},
+        {
+            "repo_name": repo_name,
+            "owner": owner,
+            "cursor": cursor,
+        },
     )
+
     repository = data.get("repository") or {}
     branch = repository.get("defaultBranchRef")
 
-    # Empty repository or repository with no default branch.
     if not branch:
         return addition_total, deletion_total, my_commits
 
@@ -410,9 +416,14 @@ def recursive_loc(owner, repo_name, addition_total=0,
     return addition_total, deletion_total, my_commits
 
 
-def cache_builder(edges, comment_size, force_cache,
-                  loc_add=0, loc_del=0):
-    """Update the repository cache and return total additions and deletions."""
+def cache_builder(
+    edges,
+    comment_size,
+    force_cache,
+    loc_add=0,
+    loc_del=0,
+):
+    """Update repository cache and return total additions and deletions."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     valid_edges = []
@@ -427,6 +438,7 @@ def cache_builder(edges, comment_size, force_cache,
     if CACHE_FILE.exists():
         with CACHE_FILE.open("r", encoding="utf-8") as file:
             existing = file.readlines()
+
         comments = existing[:comment_size]
 
         for line in existing[comment_size:]:
@@ -468,6 +480,7 @@ def cache_builder(edges, comment_size, force_cache,
         else:
             owner, repo_name = full_name.split("/", 1)
             additions, deletions, commits = recursive_loc(owner, repo_name)
+
             row = [
                 repo_hash,
                 str(commit_count),
@@ -497,6 +510,7 @@ def commit_counter(comment_size=7):
         raise RuntimeError("Cache file is missing; run loc_query first.")
 
     total = 0
+
     with CACHE_FILE.open("r", encoding="utf-8") as file:
         lines = file.readlines()[comment_size:]
 
@@ -522,11 +536,12 @@ def justify_format(root, element_id, new_text, length=0):
     """Format a value and adjust its adjacent dot leader."""
     if isinstance(new_text, int):
         new_text = f"{new_text:,}"
-    new_text = str(new_text)
 
+    new_text = str(new_text)
     find_and_replace(root, element_id, new_text)
 
     just_len = max(0, length - len(new_text))
+
     if just_len <= 2:
         dot_string = {0: "", 1: " ", 2: ". "}[just_len]
     else:
@@ -535,9 +550,17 @@ def justify_format(root, element_id, new_text, length=0):
     find_and_replace(root, f"{element_id}_dots", dot_string)
 
 
-def svg_overwrite(filename, age_data, commit_data, star_data,
-                  repo_data, contrib_data, follower_data, loc_data):
-    """Update the existing SVG's statistic text elements."""
+def svg_overwrite(
+    filename,
+    age_data,
+    commit_data,
+    star_data,
+    repo_data,
+    contrib_data,
+    follower_data,
+    loc_data,
+):
+    """Update statistic text in an existing SVG."""
     if not os.path.exists(filename):
         raise FileNotFoundError(
             f"Required SVG file '{filename}' was not found."
@@ -566,8 +589,12 @@ def perf_counter(function, *args):
 
 
 def formatter(name, elapsed, result=None):
-    """Print elapsed time and return the result."""
-    units = f"{elapsed:.4f} s" if elapsed > 1 else f"{elapsed * 1000:.4f} ms"
+    """Print elapsed time and return the optional result."""
+    units = (
+        f"{elapsed:.4f} s"
+        if elapsed > 1
+        else f"{elapsed * 1000:.4f} ms"
+    )
     print(f"   {name + ':':<23}{units:>12}")
     return result
 
@@ -581,7 +608,7 @@ def main():
     OWNER_ID, account_created = user_data
     formatter("account data", elapsed)
 
-    # Keep the original configured birthday.
+    # Preserve your configured birthday.
     birthday = datetime.datetime(2002, 7, 5)
     age_data, elapsed = perf_counter(daily_readme, birthday)
     formatter("age calculation", elapsed)
@@ -617,9 +644,7 @@ def main():
     follower_data, elapsed = perf_counter(follower_getter, USER_NAME)
     formatter("follower count", elapsed)
 
-    formatted_loc = [
-        f"{value:,}" for value in loc_data[:3]
-    ]
+    formatted_loc = [f"{value:,}" for value in loc_data[:3]]
 
     svg_overwrite(
         "dark_mode.svg",
@@ -631,6 +656,7 @@ def main():
         follower_data,
         formatted_loc,
     )
+
     svg_overwrite(
         "light_mode.svg",
         age_data,
@@ -642,7 +668,7 @@ def main():
         formatted_loc,
     )
 
-    print("Total GitHub GraphQL API calls:", sum(QUERY_COUNT.values()))
+    print("Total GitHub API calls:", sum(QUERY_COUNT.values()))
     for name, count in QUERY_COUNT.items():
         print(f"   {name + ':':<28}{count:>6}")
 
