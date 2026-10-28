@@ -608,7 +608,7 @@ def main():
     formatter("account data", elapsed)
 
     # Preserve your configured birthday.
-    birthday = datetime.datetime(2002, 7, 5)
+    birthday = datetime.datetime(2005, 28, 6)
     age_data, elapsed = perf_counter(daily_readme, birthday)
     formatter("age calculation", elapsed)
 
