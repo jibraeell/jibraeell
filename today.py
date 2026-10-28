@@ -572,7 +572,6 @@ def svg_overwrite(
     justify_format(root, "commit_data", commit_data, 20)
     justify_format(root, "star_data", star_data, 15)
     justify_format(root, "repo_data", repo_data, 6)
-    justify_format(root, "contrib_data", contrib_data)
     justify_format(root, "follower_data", follower_data, 10)
     justify_format(root, "loc_data", loc_data[2], 9)
     justify_format(root, "loc_add", loc_data[0])
