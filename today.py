@@ -10,7 +10,7 @@ from dateutil import relativedelta
 from lxml import etree
 
 
-# GitHub Actions environment variables
+# GitHub Actions environment variables 
 USER_NAME = os.environ.get("USER_NAME", "").strip()
 ACCESS_TOKEN = os.environ.get("ACCESS_TOKEN", "").strip()
 
