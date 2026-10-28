@@ -570,8 +570,8 @@ def svg_overwrite(
     root = tree.getroot()
 
     justify_format(root, 'commit_data', commit_data, 22)
-    justify_format(root, 'star_data', star_data, 16)
-    justify_format(root, 'repo_data', repo_data, 6)
+    justify_format(root, 'star_data', star_data, 14)
+    justify_format(root, 'repo_data', repo_data, 8)
     justify_format(root, 'contrib_data', contrib_data)
     justify_format(root, 'follower_data', follower_data, 10)
     justify_format(root, 'loc_data', loc_data[2], 7)
