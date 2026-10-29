@@ -14,7 +14,7 @@ size-adjust: 109%;
 .delColor {fill: #f85149;}
 .cc {fill: #616e7f;}
 <image
-  href="profile.jpg"
+  href="Profile.jpg"
   x="15"
   y="30"
   width="340"
