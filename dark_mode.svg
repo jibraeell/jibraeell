@@ -14,13 +14,14 @@ size-adjust: 109%;
 .delColor {fill: #f85149;}
 .cc {fill: #616e7f;}
 <image
-  href="Profile.jpg"
+  href="https://raw.githubusercontent.com/jibraeell/jibraeell/main/profile.jpg"
   x="15"
   y="30"
   width="340"
   height="450"
   preserveAspectRatio="xMidYMid slice"
 />
+
 <text x="390" y="30" fill="#c9d1d9">
 <tspan x="390" y="30">jibraeell</tspan> -——————————————————————————————————————————————-—-
 <tspan x="390" y="50" class="cc">. </tspan><tspan class="key">OS</tspan>:<tspan class="cc"> .................................... </tspan><tspan class="value">Windows 11, Linux</tspan>
