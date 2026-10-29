@@ -15,14 +15,14 @@ size-adjust: 109%;
 .cc {fill: #616e7f;}
 text, tspan {white-space: pre;}
 </style>
-<rect width="985px" height="530px" fill="#f6f8fa" rx="15"/>
-<text x="15" y="30" fill="#24292f" class="ascii">
+<rect width="985px" height="530px" fill="#161b22" rx="15"/>
+<text x="15" y="30" fill="#c9d1d9" class="ascii">
 <tspan x="15" y="30">     .....:--=-:...........         </tspan>
 <tspan x="15" y="49">       :*%%@@@@*: .......          </tspan>
 <tspan x="15" y="68">      :%@@@@@@@@@-                 </tspan>
 <tspan x="15" y="87">     .%@@@@@@@@@@%.                </tspan>
 <tspan x="15" y="106">   . :@@@@@@@@@%%@-                </tspan>
-<tspan x="15" y="125">   . .%@@@@@@@@@%@@-      ....     </tspan>
+<tspan x="15" y="125">   . .%@@@@@@@@@%@@-      ...      </tspan>
 <tspan x="15" y="144">      +@@%%%@*#%###:       ..      </tspan>
 <tspan x="15" y="163">      =@@*-+*=+#**:                </tspan>
 <tspan x="15" y="182">     ..##++**++#**:                </tspan>
